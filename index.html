@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PHISHSCAN // Threat Analysis Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --void:     #07070d;
+    --panel:    #0f0f1a;
+    --border:   #1e1e35;
+    --green:    #00ff9f;
+    --green-dim:#00cc7a;
+    --red:      #ff003c;
+    --red-dim:  #cc002f;
+    --purple:   #7b2fff;
+    --amber:    #ffaa00;
+    --silver:   #b0b0c8;
+    --dim:      #50505f;
+    --white:    #e8e8f0;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--void);
+    color: var(--silver);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay on whole page */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.07) 2px,
+      rgba(0,0,0,0.07) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ── Header ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--panel);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 20px;
+    letter-spacing: 0.12em;
+    color: var(--green);
+    text-shadow: 0 0 18px rgba(0,255,159,0.55);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-icon {
+    width: 22px;
+    height: 22px;
+    border: 2px solid var(--green);
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    box-shadow: 0 0 10px rgba(0,255,159,0.3);
+  }
+
+  .logo span.slash { color: var(--purple); text-shadow: 0 0 12px rgba(123,47,255,0.6); }
+
+  .header-meta {
+    font-size: 10px;
+    color: var(--dim);
+    letter-spacing: 0.08em;
+    text-align: right;
+    line-height: 1.9;
+  }
+  .header-meta .live {
+    color: var(--green);
+    animation: pulse 2s infinite;
+    text-shadow: 0 0 8px rgba(0,255,159,0.5);
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ── Layout ── */
+  .workspace {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    height: calc(100vh - 53px);
+    min-height: 500px;
+  }
+
+  /* ── Panels ── */
+  .panel {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .panel:last-child { border-right: none; }
+
+  .panel-header {
+    background: rgba(30,30,53,0.5);
+    border-bottom: 1px solid var(--border);
+    padding: 9px 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  .panel-header .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--dim);
+  }
+  .panel-header .dot.active { background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+  .panel-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    color: var(--dim);
+    text-transform: uppercase;
+  }
+
+  .panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  /* ── Input ── */
+  .input-label {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    color: var(--dim);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .input-label span {
+    color: var(--purple);
+    text-shadow: 0 0 8px rgba(123,47,255,0.5);
+  }
+
+  textarea#emailInput {
+    width: 100%;
+    height: 260px;
+    background: rgba(0,0,0,0.45);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--white);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.65;
+    padding: 14px;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    caret-color: var(--green);
+  }
+  textarea#emailInput::placeholder { color: var(--dim); }
+  textarea#emailInput:focus {
+    border-color: rgba(123,47,255,0.5);
+    box-shadow: 0 0 0 1px rgba(123,47,255,0.2), inset 0 0 20px rgba(123,47,255,0.04);
+  }
+
+  /* ── Scan button ── */
+  .btn-scan {
+    margin-top: 16px;
+    width: 100%;
+    padding: 13px 20px;
+    background: transparent;
+    border: 1px solid var(--green);
+    border-radius: 4px;
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.2em;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: color 0.2s, box-shadow 0.2s;
+    text-transform: uppercase;
+  }
+  .btn-scan:hover {
+    color: var(--void);
+    background: var(--green);
+    box-shadow: 0 0 28px rgba(0,255,159,0.45);
+  }
+  .btn-scan:active { transform: scale(0.99); }
+  .btn-scan:disabled {
+    border-color: var(--dim);
+    color: var(--dim);
+    cursor: not-allowed;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  /* sweep animation on button */
+  .btn-scan::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 60%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(0,255,159,0.15), transparent);
+    transition: none;
+  }
+  .btn-scan.scanning::before {
+    animation: sweep 0.9s ease-in-out infinite;
+  }
+  @keyframes sweep { to { left: 160%; } }
+
+  /* ── Clear button ── */
+  .btn-clear {
+    margin-top: 10px;
+    width: 100%;
+    padding: 9px 20px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--dim);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+    text-transform: uppercase;
+  }
+  .btn-clear:hover { color: var(--silver); border-color: var(--silver); }
+
+  /* ── Sample emails ── */
+  .samples-label {
+    margin-top: 22px;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    color: var(--dim);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .sample-list { display: flex; flex-direction: column; gap: 6px; }
+  .sample-btn {
+    text-align: left;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 8px 12px;
+    color: var(--silver);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sample-btn:hover { border-color: var(--purple); color: var(--white); }
+  .sample-btn .tag {
+    display: inline-block;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    padding: 1px 5px;
+    border-radius: 2px;
+    margin-right: 7px;
+    font-family: 'Share Tech Mono', monospace;
+  }
+  .tag.phish { background: rgba(255,0,60,0.15); color: var(--red); border: 1px solid rgba(255,0,60,0.3); }
+  .tag.safe  { background: rgba(0,255,159,0.1); color: var(--green); border: 1px solid rgba(0,255,159,0.25); }
+
+  /* ── Results panel ── */
+  .result-idle {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    color: var(--dim);
+  }
+  .result-idle .idle-icon {
+    width: 60px; height: 60px;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    color: var(--dim);
+  }
+  .result-idle p { font-size: 11px; letter-spacing: 0.1em; }
+
+  /* ── Verdict banner ── */
+  .verdict {
+    border-radius: 4px;
+    padding: 16px 18px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    animation: fadeSlide 0.35s ease;
+  }
+  @keyframes fadeSlide { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+
+  .verdict.threat {
+    background: rgba(255,0,60,0.08);
+    border: 1px solid rgba(255,0,60,0.4);
+    box-shadow: 0 0 30px rgba(255,0,60,0.1);
+  }
+  .verdict.clean {
+    background: rgba(0,255,159,0.07);
+    border: 1px solid rgba(0,255,159,0.35);
+    box-shadow: 0 0 30px rgba(0,255,159,0.08);
+  }
+  .verdict.suspect {
+    background: rgba(255,170,0,0.07);
+    border: 1px solid rgba(255,170,0,0.35);
+    box-shadow: 0 0 30px rgba(255,170,0,0.08);
+  }
+
+  .verdict-icon {
+    font-size: 26px;
+    flex-shrink: 0;
+  }
+  .verdict-text .verdict-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 16px;
+    letter-spacing: 0.1em;
+  }
+  .verdict.threat .verdict-title { color: var(--red); text-shadow: 0 0 16px rgba(255,0,60,0.6); }
+  .verdict.clean  .verdict-title { color: var(--green); text-shadow: 0 0 16px rgba(0,255,159,0.5); }
+  .verdict.suspect .verdict-title { color: var(--amber); text-shadow: 0 0 16px rgba(255,170,0,0.5); }
+
+  .verdict-text .verdict-sub { font-size: 11px; color: var(--silver); margin-top: 2px; }
+
+  /* ── Score meter ── */
+  .score-block {
+    margin-bottom: 20px;
+    animation: fadeSlide 0.4s ease 0.05s both;
+  }
+  .score-meta {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 7px;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--dim);
+    text-transform: uppercase;
+  }
+  .score-val { font-family: 'Share Tech Mono', monospace; font-size: 13px; }
+  .score-val.threat-score { color: var(--red); }
+  .score-val.clean-score  { color: var(--green); }
+  .score-val.suspect-score { color: var(--amber); }
+
+  .meter-track {
+    height: 5px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .meter-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.8s cubic-bezier(0.22,1,0.36,1);
+  }
+  .meter-fill.threat-fill  { background: linear-gradient(90deg, #cc002f, #ff003c); box-shadow: 0 0 8px rgba(255,0,60,0.6); }
+  .meter-fill.clean-fill   { background: linear-gradient(90deg, #00cc7a, #00ff9f); box-shadow: 0 0 8px rgba(0,255,159,0.5); }
+  .meter-fill.suspect-fill { background: linear-gradient(90deg, #cc8800, #ffaa00); box-shadow: 0 0 8px rgba(255,170,0,0.5); }
+
+  /* ── Signal breakdown ── */
+  .section-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--dim);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .signals-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; animation: fadeSlide 0.45s ease 0.1s both; }
+
+  .signal-row {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 9px 12px;
+    display: grid;
+    grid-template-columns: 16px 1fr auto auto;
+    align-items: center;
+    gap: 10px;
+    transition: border-color 0.2s;
+  }
+  .signal-row.hit { border-color: rgba(255,0,60,0.3); background: rgba(255,0,60,0.04); }
+  .signal-row.warn { border-color: rgba(255,170,0,0.25); background: rgba(255,170,0,0.03); }
+  .signal-row.ok   { border-color: rgba(0,255,159,0.2); }
+
+  .signal-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .signal-dot.hit  { background: var(--red);   box-shadow: 0 0 5px var(--red); }
+  .signal-dot.warn { background: var(--amber);  box-shadow: 0 0 5px var(--amber); }
+  .signal-dot.ok   { background: var(--dim);   }
+
+  .signal-name { font-size: 11px; color: var(--silver); }
+  .signal-detail { font-size: 10px; color: var(--dim); text-align: right; }
+  .signal-badge {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 2px;
+    letter-spacing: 0.1em;
+    flex-shrink: 0;
+  }
+  .badge-hit  { background: rgba(255,0,60,0.15); color: var(--red); border: 1px solid rgba(255,0,60,0.3); }
+  .badge-warn { background: rgba(255,170,0,0.12); color: var(--amber); border: 1px solid rgba(255,170,0,0.3); }
+  .badge-ok   { background: rgba(0,255,159,0.08); color: var(--green-dim); border: 1px solid rgba(0,255,159,0.2); }
+
+  /* ── Matched patterns ── */
+  .matched-block { margin-bottom: 20px; animation: fadeSlide 0.5s ease 0.15s both; }
+  .matched-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .match-pill {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 2px;
+    background: rgba(255,0,60,0.1);
+    border: 1px solid rgba(255,0,60,0.25);
+    color: var(--red);
+  }
+  .match-pill.warn-pill {
+    background: rgba(255,170,0,0.1);
+    border-color: rgba(255,170,0,0.25);
+    color: var(--amber);
+  }
+
+  .no-matches { font-size: 11px; color: var(--dim); }
+
+  /* ── Stats row ── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3,1fr);
+    gap: 8px;
+    margin-bottom: 20px;
+    animation: fadeSlide 0.5s ease 0.2s both;
+  }
+  .stat-card {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px;
+    text-align: center;
+  }
+  .stat-num {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 20px;
+    color: var(--white);
+    display: block;
+    line-height: 1.2;
+  }
+  .stat-label { font-size: 9px; letter-spacing: 0.12em; color: var(--dim); text-transform: uppercase; }
+
+  /* ── Log ── */
+  .log-block { animation: fadeSlide 0.55s ease 0.25s both; }
+  .log-lines { display: flex; flex-direction: column; gap: 3px; }
+  .log-line {
+    font-size: 10px;
+    color: var(--dim);
+    display: flex;
+    gap: 10px;
+  }
+  .log-line .ts { color: var(--purple); flex-shrink: 0; }
+  .log-line.info .msg { color: var(--silver); }
+  .log-line.flag .msg { color: var(--red); }
+  .log-line.warn .msg { color: var(--amber); }
+  .log-line.good .msg { color: var(--green); }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── Responsive ── */
+  @media (max-width: 760px) {
+    .workspace { grid-template-columns: 1fr; height: auto; }
+    .panel { border-right: none; border-bottom: 1px solid var(--border); min-height: 50vh; }
+    textarea#emailInput { height: 180px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⬡</div>
+    PHISHSCAN <span class="slash">//</span> v2.4
+  </div>
+  <div class="header-meta">
+    <div><span class="live">● LIVE</span> &nbsp;RULE ENGINE ACTIVE</div>
+    <div>SESSION: <span id="sessionId">--</span></div>
+  </div>
+</header>
+
+<div class="workspace">
+
+  <!-- LEFT: Input -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="dot active"></div>
+      <span class="panel-label">Email Input Terminal</span>
+    </div>
+    <div class="panel-body">
+      <div class="input-label">PASTE EMAIL CONTENT &nbsp;<span>[ CTRL+A TO SELECT ALL ]</span></div>
+      <textarea id="emailInput" placeholder="Paste the full email here — headers, body, links, everything..."></textarea>
+
+      <button class="btn-scan" id="scanBtn" onclick="runScan()">
+        ▶ &nbsp; INITIATE SCAN
+      </button>
+      <button class="btn-clear" onclick="clearAll()">✕ &nbsp; CLEAR</button>
+
+      <div class="samples-label">Load sample email</div>
+      <div class="sample-list" id="sampleList"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Results -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="dot" id="resultDot"></div>
+      <span class="panel-label">Threat Analysis Readout</span>
+    </div>
+    <div class="panel-body" id="resultPanel">
+      <div class="result-idle">
+        <div class="idle-icon">◎</div>
+        <p>AWAITING INPUT</p>
+        <p style="font-size:10px;">Paste an email and run scan</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── Session ID
+document.getElementById('sessionId').textContent = Math.random().toString(36).slice(2,10).toUpperCase();
+
+// ── Sample emails
+const SAMPLES = [
+  {
+    label: "PayPal account suspended",
+    type: "phish",
+    text: `From: security@paypa1-support.com
+Subject: URGENT: Your PayPal account has been suspended
+
+Dear Valued Customer,
+
+We have detected unusual activity on your account. Your account has been temporarily SUSPENDED.
+
+To restore access immediately, click the link below and verify your identity:
+
+http://paypal-secure-login.xyz/verify?id=38291&token=abc123
+
+You must act within 24 HOURS or your account will be permanently closed.
+
+Enter your Social Security Number, full name, password, and credit card number to verify.
+
+Do not ignore this message. Failure to comply will result in account termination.
+
+PayPal Security Team
+security@paypa1-support.com`
+  },
+  {
+    label: "Google password reset (real)",
+    type: "safe",
+    text: `From: no-reply@accounts.google.com
+To: user@example.com
+Subject: Security alert for your Google Account
+
+Hi,
+
+Someone recently used your password to try to sign in to your Google Account. Google blocked them, but you should check what happened.
+
+Review activity:
+https://accounts.google.com/signin/activity
+
+You received this email to let you know about important changes to your Google Account and services.
+© 2024 Google LLC, 1600 Amphitheatre Parkway, Mountain View, CA 94043`
+  },
+  {
+    label: "You've won $1,000,000!",
+    type: "phish",
+    text: `From: winners@lottery-claim-prize.net
+Subject: Congratulations! You Have Won $1,000,000 USD!!!
+
+CONGRATULATIONS!!!
+
+You have been selected as our LUCKY WINNER of ONE MILLION DOLLARS in our international online lottery.
+
+To claim your prize IMMEDIATELY, send the following:
+- Full name
+- Home address  
+- Phone number
+- Bank account and routing number
+- Copy of your passport
+
+Wire a processing fee of $199 to our agent to release your funds.
+
+Act NOW! This offer expires in 48 hours. Do not tell anyone about this email.
+
+Claim now: http://mega-prize-claim.ru/winner/claim?ref=YOU
+
+Dr. James Wilson
+International Lottery Commission`
+  },
+  {
+    label: "GitHub 2FA code (real)",
+    type: "safe",
+    text: `From: noreply@github.com
+To: developer@example.com
+Subject: [GitHub] Please verify your device
+
+Hey developer,
+
+Use this code to finish setting up your two-factor authentication:
+
+428 391
+
+This code will expire in 15 minutes.
+
+If you didn't request this, you can ignore this email.
+
+Thanks,
+The GitHub Team`
+  },
+  {
+    label: "CEO wire transfer request",
+    type: "phish",
+    text: `From: ceo.michael.thompson@company-corp.net
+Subject: Urgent Wire Transfer Needed - Confidential
+
+Hello,
+
+I need you to process a wire transfer of $47,500 immediately. This is time sensitive and confidential — please do not discuss with anyone else in the office.
+
+Transfer to:
+Account Name: Global Ventures LLC
+Routing: 021000089
+Account: 7834920183
+
+I am in a meeting and cannot be reached by phone. Just reply to this email when done.
+
+Do not forward this email. Delete after reading.
+
+Best,
+Michael Thompson
+CEO`
+  }
+];
+
+// Render sample buttons
+const sampleList = document.getElementById('sampleList');
+SAMPLES.forEach((s, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'sample-btn';
+  btn.innerHTML = `<span class="tag ${s.type === 'phish' ? 'phish' : 'safe'}">${s.type.toUpperCase()}</span>${s.label}`;
+  btn.onclick = () => {
+    document.getElementById('emailInput').value = s.text;
+    document.getElementById('emailInput').focus();
+  };
+  sampleList.appendChild(btn);
+});
+
+// ── Rule-based detection engine
+const RULES = [
+  {
+    id: 'urgency',
+    name: 'Urgency / Pressure Language',
+    weight: 20,
+    level: 'high',
+    patterns: [/\b(urgent|immediately|act now|within \d+ hours?|expires?|expire in|limited time|do not (delay|ignore|wait)|time.sensitive|right away|as soon as possible)\b/gi],
+    detail: 'Creates artificial time pressure'
+  },
+  {
+    id: 'threats',
+    name: 'Threat / Consequence Language',
+    weight: 25,
+    level: 'high',
+    patterns: [/\b(suspend(ed|ed)?|terminat(e|ed|ion)|block(ed)?|clos(e|ed)|disabled?|deleted?|restrict(ed)?|permanently|shut down)\b/gi],
+    detail: 'Threatens negative consequences'
+  },
+  {
+    id: 'spoofed_domain',
+    name: 'Spoofed or Lookalike Domain',
+    weight: 30,
+    level: 'high',
+    patterns: [
+      /from:.*@(?!(?:gmail|yahoo|outlook|hotmail|icloud|proton)\.(com|net|org))[\w-]*(?:paypal|amazon|apple|google|microsoft|netflix|bank|secure|support|service|account|login|verify|update|help|alert|security)[\w-]*\.[a-z]{2,}/gi,
+      /[\w-]+(paypa1|amaz0n|g00gle|micros0ft|app1e|netf1ix|1ogin|secure-|verification)[\w-]*\.(xyz|tk|ml|ga|cf|ru|cn|online|site|club|info|biz|net|top|work)/gi
+    ],
+    detail: 'Domain mimics a trusted brand'
+  },
+  {
+    id: 'suspicious_url',
+    name: 'Suspicious URL / Link',
+    weight: 25,
+    level: 'high',
+    patterns: [
+      /https?:\/\/(?!(?:www\.)?(google|github|microsoft|apple|amazon|paypal|facebook|twitter|linkedin)\.(com|org|net))[^\s]*(?:login|verify|secure|account|update|confirm|click|redirect|token|reset|suspend)[^\s]*/gi,
+      /https?:\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/gi,
+      /https?:\/\/[^\s]*\.(xyz|tk|ml|ga|cf|ru|cn|online|site|club|top)\//gi
+    ],
+    detail: 'URL appears deceptive or uses suspicious TLD'
+  },
+  {
+    id: 'pii_request',
+    name: 'Requests Personal Information',
+    weight: 30,
+    level: 'high',
+    patterns: [/\b(social security|ssn|credit card|bank account|routing number|passport|date of birth|mother.s maiden|pin number|account number|cvv|password)\b/gi],
+    detail: 'Asks for sensitive credentials or PII'
+  },
+  {
+    id: 'money_transfer',
+    name: 'Money / Wire Transfer Request',
+    weight: 28,
+    level: 'high',
+    patterns: [/\b(wire transfer|western union|moneygram|gift card|bitcoin|crypto|processing fee|send money|transfer.*fund|bank transfer|payment.*urgent)\b/gi],
+    detail: 'Requests money or financial transaction'
+  },
+  {
+    id: 'prize_lottery',
+    name: 'Prize / Lottery Language',
+    weight: 22,
+    level: 'high',
+    patterns: [/\b(you('ve| have) won|lottery|prize|claim your|winner|selected.*winner|million dollar|jackpot|congratulation.*win|sweepstake)\b/gi],
+    detail: 'Classic prize or lottery scam language'
+  },
+  {
+    id: 'secrecy',
+    name: 'Secrecy / Confidentiality Demand',
+    weight: 18,
+    level: 'high',
+    patterns: [/\b(do not (tell|share|forward|discuss)|keep.*secret|confidential|delete after|do not reply.*all|between us)\b/gi],
+    detail: 'Instructs recipient to keep quiet'
+  },
+  {
+    id: 'generic_greeting',
+    name: 'Generic / Missing Greeting',
+    weight: 8,
+    level: 'medium',
+    patterns: [/\b(dear (valued|customer|user|member|sir|madam|account holder)|dear valued|hello user|dear client)\b/gi],
+    detail: 'Impersonal or generic salutation'
+  },
+  {
+    id: 'excessive_caps',
+    name: 'Excessive Capitalization',
+    weight: 8,
+    level: 'medium',
+    patterns: [/[A-Z]{4,}\s+[A-Z]{4,}/g],
+    detail: 'Unusual use of ALL-CAPS for emphasis'
+  },
+  {
+    id: 'excessive_punct',
+    name: 'Excessive Punctuation',
+    weight: 6,
+    level: 'medium',
+    patterns: [/(!{2,}|\?{2,}|[!?]{3,})/g],
+    detail: 'Multiple exclamation or question marks'
+  },
+  {
+    id: 'misspellings',
+    name: 'Common Phishing Misspellings',
+    weight: 10,
+    level: 'medium',
+    patterns: [/\b(acount|recieve|varify|verifiy|controll|priviledge|informaton|securty|acces\b|informtion|seperate|occured)\b/gi],
+    detail: 'Words commonly misspelled in phishing'
+  },
+  {
+    id: 'shortened_url',
+    name: 'Shortened / Obfuscated URL',
+    weight: 12,
+    level: 'medium',
+    patterns: [/https?:\/\/(bit\.ly|tinyurl\.com|t\.co|goo\.gl|ow\.ly|short\.ly|rb\.gy|is\.gd|buff\.ly|ift\.tt)\//gi],
+    detail: 'Hides true destination behind URL shortener'
+  },
+  {
+    id: 'html_form',
+    name: 'Embedded Form or Input Request',
+    weight: 15,
+    level: 'medium',
+    patterns: [/<form|<input|<button.*submit/gi],
+    detail: 'Contains embedded HTML form elements'
+  }
+];
+
+function runScan() {
+  const text = document.getElementById('emailInput').value.trim();
+  if (!text) { showError('No email content to analyze.'); return; }
+
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = true;
+  btn.classList.add('scanning');
+  btn.textContent = '◌ SCANNING...';
+
+  setTimeout(() => {
+    const result = analyze(text);
+    renderResult(result, text);
+    btn.disabled = false;
+    btn.classList.remove('scanning');
+    btn.textContent = '▶ \u00A0 INITIATE SCAN';
+  }, 900);
+}
+
+function analyze(text) {
+  const lower = text.toLowerCase();
+  let totalScore = 0;
+  const signals = [];
+  const matchedPatterns = [];
+  const warnings = [];
+
+  for (const rule of RULES) {
+    let ruleHits = [];
+    for (const pattern of rule.patterns) {
+      const matches = text.match(pattern) || [];
+      ruleHits = [...ruleHits, ...matches];
+    }
+    // Deduplicate
+    ruleHits = [...new Set(ruleHits.map(m => m.trim().toLowerCase()))].slice(0, 5);
+
+    const hit = ruleHits.length > 0;
+    const contribution = hit ? Math.min(rule.weight, rule.weight * (1 + (ruleHits.length - 1) * 0.2)) : 0;
+    if (hit) totalScore += contribution;
+
+    signals.push({
+      ...rule,
+      hit,
+      ruleHits,
+      contribution: Math.round(contribution)
+    });
+
+    if (hit && ruleHits.length > 0) {
+      matchedPatterns.push({ patterns: ruleHits, level: rule.level });
+      if (rule.level === 'medium') warnings.push(rule.name);
+    }
+  }
+
+  // Cap at 100
+  const score = Math.min(100, Math.round(totalScore));
+
+  let verdict, cls;
+  if (score >= 40)      { verdict = 'PHISHING DETECTED';   cls = 'threat'; }
+  else if (score >= 18) { verdict = 'SUSPICIOUS EMAIL';    cls = 'suspect'; }
+  else                  { verdict = 'APPEARS LEGITIMATE';  cls = 'clean'; }
+
+  const wordCount  = text.split(/\s+/).filter(Boolean).length;
+  const linkCount  = (text.match(/https?:\/\//gi) || []).length;
+  const flagCount  = signals.filter(s => s.hit && s.level === 'high').length;
+
+  return { score, verdict, cls, signals, matchedPatterns, wordCount, linkCount, flagCount, warnings };
+}
+
+function renderResult(r, rawText) {
+  const dot = document.getElementById('resultDot');
+  dot.className = 'dot active';
+  dot.style.background = r.cls === 'threat' ? 'var(--red)' : r.cls === 'suspect' ? 'var(--amber)' : 'var(--green)';
+  dot.style.boxShadow   = r.cls === 'threat' ? '0 0 6px var(--red)' : r.cls === 'suspect' ? '0 0 6px var(--amber)' : '0 0 6px var(--green)';
+
+  const icon = r.cls === 'threat' ? '⛔' : r.cls === 'suspect' ? '⚠️' : '✅';
+  const sub  = r.cls === 'threat'
+    ? `Threat score ${r.score}/100 — High confidence phishing indicators found`
+    : r.cls === 'suspect'
+    ? `Threat score ${r.score}/100 — Suspicious patterns detected, proceed with caution`
+    : `Threat score ${r.score}/100 — No significant threats detected`;
+
+  // Build matched pills
+  const allHits   = r.matchedPatterns.filter(m => m.level === 'high').flatMap(m => m.patterns).slice(0, 14);
+  const allWarns  = r.matchedPatterns.filter(m => m.level === 'medium').flatMap(m => m.patterns).slice(0, 8);
+
+  const pillsHTML = allHits.length || allWarns.length
+    ? [
+        ...allHits.map(p  => `<span class="match-pill">${escHtml(p)}</span>`),
+        ...allWarns.map(p => `<span class="match-pill warn-pill">${escHtml(p)}</span>`)
+      ].join('')
+    : `<span class="no-matches">No specific pattern matches</span>`;
+
+  // Signal rows
+  const signalRows = r.signals.map(s => {
+    const stateClass = s.hit ? (s.level === 'high' ? 'hit' : 'warn') : 'ok';
+    const dotClass   = s.hit ? (s.level === 'high' ? 'hit' : 'warn') : 'ok';
+    const badgeClass = s.hit ? (s.level === 'high' ? 'badge-hit' : 'badge-warn') : 'badge-ok';
+    const badgeText  = s.hit ? (s.level === 'high' ? 'FLAG' : 'WARN') : 'PASS';
+    const detail     = s.hit ? `+${s.contribution} pts` : '—';
+    return `
+    <div class="signal-row ${stateClass}">
+      <div class="signal-dot ${dotClass}"></div>
+      <span class="signal-name">${s.name}</span>
+      <span class="signal-detail">${detail}</span>
+      <span class="signal-badge ${badgeClass}">${badgeText}</span>
+    </div>`;
+  }).join('');
+
+  // Log entries
+  const now = new Date();
+  const ts  = () => `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+  const flagged = r.signals.filter(s => s.hit && s.level === 'high');
+  const warned  = r.signals.filter(s => s.hit && s.level === 'medium');
+
+  let logLines = `<div class="log-line info"><span class="ts">${ts()}</span><span class="msg">Scan initiated — ${r.wordCount} words, ${r.linkCount} URLs detected</span></div>`;
+  flagged.forEach(s => {
+    logLines += `<div class="log-line flag"><span class="ts">${ts()}</span><span class="msg">HIGH: ${s.name} — ${s.ruleHits.length} match(es)</span></div>`;
+  });
+  warned.forEach(s => {
+    logLines += `<div class="log-line warn"><span class="ts">${ts()}</span><span class="msg">MED: ${s.name} — ${s.ruleHits.length} match(es)</span></div>`;
+  });
+  logLines += `<div class="log-line ${r.cls === 'clean' ? 'good' : r.cls === 'threat' ? 'flag' : 'warn'}"><span class="ts">${ts()}</span><span class="msg">Verdict: ${r.verdict} (score ${r.score}/100)</span></div>`;
+
+  document.getElementById('resultPanel').innerHTML = `
+    <div class="verdict ${r.cls}">
+      <div class="verdict-icon">${icon}</div>
+      <div class="verdict-text">
+        <div class="verdict-title">${r.verdict}</div>
+        <div class="verdict-sub">${sub}</div>
+      </div>
+    </div>
+
+    <div class="score-block">
+      <div class="score-meta">
+        <span>THREAT SCORE</span>
+        <span class="score-val ${r.cls}-score">${r.score} / 100</span>
+      </div>
+      <div class="meter-track">
+        <div class="meter-fill ${r.cls}-fill" id="meterFill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <span class="stat-num">${r.flagCount}</span>
+        <span class="stat-label">High Flags</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-num">${r.linkCount}</span>
+        <span class="stat-label">URLs Found</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-num">${r.wordCount}</span>
+        <span class="stat-label">Word Count</span>
+      </div>
+    </div>
+
+    <div class="section-title">Signal Breakdown</div>
+    <div class="signals-grid">${signalRows}</div>
+
+    <div class="matched-block">
+      <div class="section-title">Matched Patterns</div>
+      <div class="matched-list">${pillsHTML}</div>
+    </div>
+
+    <div class="log-block">
+      <div class="section-title">Scan Log</div>
+      <div class="log-lines">${logLines}</div>
+    </div>
+  `;
+
+  // Animate meter after render
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      const fill = document.getElementById('meterFill');
+      if (fill) fill.style.width = r.score + '%';
+    }, 80);
+  });
+}
+
+function showError(msg) {
+  document.getElementById('resultPanel').innerHTML = `
+    <div class="result-idle">
+      <div class="idle-icon" style="border-color:var(--red);color:var(--red)">!</div>
+      <p style="color:var(--red)">${msg}</p>
+    </div>`;
+}
+
+function clearAll() {
+  document.getElementById('emailInput').value = '';
+  document.getElementById('resultDot').className = 'dot';
+  document.getElementById('resultDot').style.cssText = '';
+  document.getElementById('resultPanel').innerHTML = `
+    <div class="result-idle">
+      <div class="idle-icon">◎</div>
+      <p>AWAITING INPUT</p>
+      <p style="font-size:10px;">Paste an email and run scan</p>
+    </div>`;
+}
+
+// Keyboard shortcut
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') runScan();
+});
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
